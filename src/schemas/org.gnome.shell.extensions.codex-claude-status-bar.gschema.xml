@@ -36,6 +36,15 @@
         Code bracketed-dots mark.
       </description>
     </key>
+    <key name="show-claude-fable" type="b">
+      <default>false</default>
+      <summary>Show Claude Fable model-scoped usage</summary>
+      <description>
+        When true, adds a "Fable" usage row to the Claude section of the popup
+        and enables the Claude Fable metric for the single-label panel. Reads the
+        model-scoped weekly limit whose model display name is "Fable".
+      </description>
+    </key>
     <key name="icon-style" type="s">
       <default>'color'</default>
       <summary>Icon style</summary>

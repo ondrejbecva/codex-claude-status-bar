@@ -63,25 +63,26 @@ function createWindowWidgets() {
     return {box, label, track, fill, remainingLabel, resetsLabel};
 }
 
-function createServiceSection() {
+function createServiceSection(windowCount = 2) {
     const container = new St.BoxLayout({vertical: true, style_class: 'usage-service-card'});
 
     const header = new St.BoxLayout({style_class: 'usage-service-header'});
     const nameLabel = new St.Label({style_class: 'usage-service-name'});
     header.add_child(nameLabel);
+    container.add_child(header);
 
-    const window0 = createWindowWidgets();
-    const window1 = createWindowWidgets();
+    const windows = [];
+    for (let i = 0; i < windowCount; i++) {
+        const w = createWindowWidgets();
+        windows.push(w);
+        container.add_child(w.box);
+    }
 
     const warningLabel = new St.Label({style_class: 'usage-warning'});
     warningLabel.hide();
-
-    container.add_child(header);
-    container.add_child(window0.box);
-    container.add_child(window1.box);
     container.add_child(warningLabel);
 
-    return {container, nameLabel, windows: [window0, window1], warningLabel};
+    return {container, nameLabel, windows, warningLabel};
 }
 
 const MODE_LABELS = {
@@ -89,6 +90,7 @@ const MODE_LABELS = {
     'min': 'All (minimum)',
     'claude-session': 'Claude Session',
     'claude-weekly': 'Claude Weekly',
+    'claude-fable': 'Claude Fable',
     'codex-session': 'Codex Session',
     'codex-weekly': 'Codex Weekly',
 };
@@ -211,6 +213,9 @@ class UsageIndicator extends PanelMenu.Button {
         this._colorizeChangedId = this._settings.connect('changed::panel-colorize', () => {
             this._refreshRelativeTimes();
         });
+        this._fableChangedId = this._settings.connect('changed::show-claude-fable', () => {
+            this._refreshRelativeTimes();
+        });
         this._claudeIconChangedId = this._settings.connect('changed::claude-icon', () => {
             this._refreshIconStyles();
             this._updateClaudeIconOrnaments();
@@ -276,7 +281,8 @@ class UsageIndicator extends PanelMenu.Button {
         this._codexSection = createServiceSection();
         this._codexSection.nameLabel.text = 'Codex';
 
-        this._claudeSection = createServiceSection();
+        // Claude gets a third window widget for the optional Fable row.
+        this._claudeSection = createServiceSection(3);
         this._claudeSection.nameLabel.text = 'Claude';
 
         const separator = new St.Widget({style_class: 'usage-separator'});
@@ -284,7 +290,7 @@ class UsageIndicator extends PanelMenu.Button {
 
         const footerRow = new St.BoxLayout({style_class: 'usage-footer-row'});
         footerRow.set_x_expand(true);
-        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.1.0'});
+        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.2.0'});
         this._nextUpdateLabel = new St.Label({text: 'Next update in --'});
         const footerSpacer = new St.Widget();
         footerSpacer.set_x_expand(true);
@@ -336,6 +342,16 @@ class UsageIndicator extends PanelMenu.Button {
         });
         this._layoutItem = layoutItem;
         this.menu.addMenuItem(layoutItem);
+
+        const fableItem = new PopupMenu.PopupSwitchMenuItem(
+            'Show Claude Fable usage',
+            this._settings.get_boolean('show-claude-fable'),
+        );
+        this._fableToggleSignalId = fableItem.connect('toggled', (_item, state) => {
+            this._settings.set_boolean('show-claude-fable', state);
+        });
+        this._fableItem = fableItem;
+        this.menu.addMenuItem(fableItem);
 
         this._buildClaudeIconSubmenu();
         this._buildDisplaySubmenu();
@@ -487,6 +503,7 @@ class UsageIndicator extends PanelMenu.Button {
             now: Date.now(),
             pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
             panelLabelMode: this._settings.get_string('panel-label-mode'),
+            showClaudeFable: this._settings.get_boolean('show-claude-fable'),
         }));
     }
 
@@ -496,6 +513,7 @@ class UsageIndicator extends PanelMenu.Button {
             now: Date.now(),
             pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
             panelLabelMode: this._settings.get_string('panel-label-mode'),
+            showClaudeFable: this._settings.get_boolean('show-claude-fable'),
         }));
     }
 
@@ -510,9 +528,17 @@ class UsageIndicator extends PanelMenu.Button {
 
             section.nameLabel.text = svc.name;
 
-            for (let j = 0; j < svc.windows.length; j++) {
+            // A section may own more widgets than the view-model has windows
+            // (Claude's Fable row is optional) — hide the surplus.
+            for (let j = 0; j < section.windows.length; j++) {
                 const w = svc.windows[j];
                 const widgets = section.windows[j];
+
+                if (!w) {
+                    widgets.box.hide();
+                    continue;
+                }
+                widgets.box.show();
 
                 widgets.label.text = w.label;
                 widgets.fill.style_class = FILL_CLASSES[w.dotColor] ?? 'usage-fill-red';
@@ -567,6 +593,11 @@ class UsageIndicator extends PanelMenu.Button {
             this._colorizeChangedId = null;
         }
 
+        if (this._fableChangedId && this._settings) {
+            this._settings.disconnect(this._fableChangedId);
+            this._fableChangedId = null;
+        }
+
         if (this._claudeIconChangedId && this._settings) {
             this._settings.disconnect(this._claudeIconChangedId);
             this._claudeIconChangedId = null;
@@ -585,6 +616,11 @@ class UsageIndicator extends PanelMenu.Button {
         if (this._colorizeToggleSignalId && this._colorizeItem) {
             this._colorizeItem.disconnect(this._colorizeToggleSignalId);
             this._colorizeToggleSignalId = null;
+        }
+
+        if (this._fableToggleSignalId && this._fableItem) {
+            this._fableItem.disconnect(this._fableToggleSignalId);
+            this._fableToggleSignalId = null;
         }
 
         if (this._layoutToggleSignalId && this._layoutItem) {

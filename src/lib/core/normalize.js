@@ -19,9 +19,24 @@ function unixSecondsToIso(value) {
     return new Date(seconds * 1000).toISOString();
 }
 
+// Claude reports per-model weekly caps as entries in the `limits` array, each
+// carrying a scope.model.display_name (e.g. "Fable"). Find one by name,
+// case-insensitively, so "Fable" / "Fable 5" both match.
+function findModelScopedLimit(payload, nameNeedle) {
+    const limits = Array.isArray(payload?.limits) ? payload.limits : [];
+    const needle = nameNeedle.toLowerCase();
+    return limits.find(limit => {
+        const name = limit?.scope?.model?.display_name;
+        return typeof name === 'string' && name.toLowerCase().includes(needle);
+    }) ?? null;
+}
+
 export function normalizeClaudeUsage(payload) {
     const fiveHourUtilization = Number(payload?.five_hour?.utilization);
     const sevenDayUtilization = Number(payload?.seven_day?.utilization);
+
+    const fableLimit = findModelScopedLimit(payload, 'fable');
+    const fableUtilization = Number(fableLimit?.percent);
 
     return {
         data: {
@@ -29,9 +44,14 @@ export function normalizeClaudeUsage(payload) {
             weeklyRemainingPct: clampPercent(100 - sevenDayUtilization),
             sessionResetsAtIso: payload?.five_hour?.resets_at ?? null,
             weeklyResetsAtIso: payload?.seven_day?.resets_at ?? null,
+            fableRemainingPct: Number.isFinite(fableUtilization)
+                ? clampPercent(100 - fableUtilization)
+                : null,
+            fableResetsAtIso: fableLimit?.resets_at ?? null,
         },
         hasSessionUsage: Number.isFinite(fiveHourUtilization),
         hasWeeklyUsage: Number.isFinite(sevenDayUtilization),
+        hasFableUsage: Boolean(fableLimit),
     };
 }
 

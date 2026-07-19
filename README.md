@@ -99,7 +99,12 @@ Open the indicator's popup menu:
 - **Panel display** — what the single-label mode shows. Default is `combined`
   (`5h X% / 7d Y%`, worst-case across both providers per window). Other options:
   `min` (lowest % across everything) or a specific metric (Claude/Codex ×
-  session/weekly).
+  session/weekly, plus Claude Fable).
+- **Show Claude Fable usage** — adds a **Fable** row to the Claude section of
+  the popup and unlocks the *Claude Fable* single-label metric. Reads Claude's
+  model-scoped weekly cap (the `weekly_scoped` limit whose model display name is
+  "Fable"). Off by default; the row only appears when your account actually
+  reports a Fable limit.
 - **Colorize percentages** — colour the panel numbers by remaining %.
 - **Colored icons** / **Claude icon** — brand colour vs mono; starburst vs
   brackets mark.

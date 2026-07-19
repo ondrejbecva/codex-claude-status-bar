@@ -1,6 +1,6 @@
-const VERSION = 'codex-claude-status-bar 1.1.0';
+const VERSION = 'codex-claude-status-bar 1.2.0';
 
-export const PANEL_LABEL_MODES = ['combined', 'min', 'claude-session', 'claude-weekly', 'codex-session', 'codex-weekly'];
+export const PANEL_LABEL_MODES = ['combined', 'min', 'claude-session', 'claude-weekly', 'claude-fable', 'codex-session', 'codex-weekly'];
 
 function getPanelLabelValue(summary, mode) {
     if (mode === 'min' || !mode)
@@ -13,6 +13,7 @@ function getPanelLabelValue(summary, mode) {
     switch (mode) {
         case 'claude-session': return providers.claude?.data?.sessionRemainingPct;
         case 'claude-weekly':  return providers.claude?.data?.weeklyRemainingPct;
+        case 'claude-fable':   return providers.claude?.data?.fableRemainingPct;
         case 'codex-session':  return providers.codex?.data?.sessionRemainingPct;
         case 'codex-weekly':   return providers.codex?.data?.weeklyRemainingPct;
         default: return summary?.minRemainingPct;
@@ -134,25 +135,36 @@ function buildWindowViewModel(label, remainingPct, resetsAtIso, now) {
     };
 }
 
-function buildServiceViewModel(name, providerData, providerCode, now) {
+function buildServiceViewModel(name, providerData, providerCode, now, options = {}) {
     const data = providerData ?? null;
+
+    const windows = [
+        buildWindowViewModel(
+            'Session',
+            data?.sessionRemainingPct,
+            data?.sessionResetsAtIso,
+            now,
+        ),
+        buildWindowViewModel(
+            'Weekly',
+            data?.weeklyRemainingPct,
+            data?.weeklyResetsAtIso,
+            now,
+        ),
+    ];
+
+    if (options.includeFable) {
+        windows.push(buildWindowViewModel(
+            'Fable',
+            data?.fableRemainingPct,
+            data?.fableResetsAtIso,
+            now,
+        ));
+    }
 
     return {
         name,
-        windows: [
-            buildWindowViewModel(
-                'Session',
-                data?.sessionRemainingPct,
-                data?.sessionResetsAtIso,
-                now,
-            ),
-            buildWindowViewModel(
-                'Weekly',
-                data?.weeklyRemainingPct,
-                data?.weeklyResetsAtIso,
-                now,
-            ),
-        ],
+        windows,
         warning: toWarningText(name, providerCode),
     };
 }
@@ -180,6 +192,7 @@ export function buildUsageViewModel(summary, deps = {}) {
     const version = deps.version ?? VERSION;
     const pollIntervalMs = deps.pollIntervalMs ?? 180_000;
     const panelLabelMode = deps.panelLabelMode ?? 'combined';
+    const showClaudeFable = deps.showClaudeFable ?? false;
 
     const claude = summary?.providers?.claude ?? null;
     const codex = summary?.providers?.codex ?? null;
@@ -188,7 +201,7 @@ export function buildUsageViewModel(summary, deps = {}) {
         panelLabel: buildPanelLabel(summary, panelLabelMode),
         services: [
             buildServiceViewModel('Codex', codex?.data, codex?.code, now),
-            buildServiceViewModel('Claude', claude?.data, claude?.code, now),
+            buildServiceViewModel('Claude', claude?.data, claude?.code, now, {includeFable: showClaudeFable}),
         ],
         version,
         lastUpdate: formatNextUpdate(summary?.lastUpdatedAtIso, pollIntervalMs, now),
