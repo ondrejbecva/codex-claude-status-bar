@@ -3,11 +3,12 @@
   <schema id="org.gnome.shell.extensions.codex-claude-status-bar"
           path="/org/gnome/shell/extensions/codex-claude-status-bar/">
     <key name="panel-label-mode" type="s">
-      <default>'min'</default>
-      <summary>Which metric to show in the panel (legacy single-metric mode)</summary>
+      <default>'combined'</default>
+      <summary>Which metric to show in the panel (single-label mode)</summary>
       <description>
-        Used only when panel-layout is 'single'. Options: min, claude-session,
-        claude-weekly, codex-session, codex-weekly
+        Used only when panel-layout is 'single'. Options: combined (worst-case
+        5h / 7d across both providers), min, claude-session, claude-weekly,
+        codex-session, codex-weekly
       </description>
     </key>
     <key name="panel-layout" type="s">

@@ -93,12 +93,13 @@ gnome-extensions install --force dist/codex-claude-status-bar@ondrejbecva.cz.she
 
 Open the indicator's popup menu:
 
-- **Panel display** — what the single-label mode shows: `min` (lowest %
-  across everything) or a specific metric (Claude/Codex × session/weekly).
-- **Per-provider panel layout** — ON shows both providers side by side, each
-  with `5h X% / 7d Y%` and its icon (a provider is hidden when it has no data).
-  OFF collapses to the single number chosen in *Panel display*. Keep it **ON**
-  to see Codex's two windows.
+- **Per-provider panel layout** — ON (default) shows both providers side by
+  side, each with `5h X% / 7d Y%` and its icon (a provider is hidden when it has
+  no data). OFF collapses to a single label chosen in *Panel display*.
+- **Panel display** — what the single-label mode shows. Default is `combined`
+  (`5h X% / 7d Y%`, worst-case across both providers per window). Other options:
+  `min` (lowest % across everything) or a specific metric (Claude/Codex ×
+  session/weekly).
 - **Colorize percentages** — colour the panel numbers by remaining %.
 - **Colored icons** / **Claude icon** — brand colour vs mono; starburst vs
   brackets mark.

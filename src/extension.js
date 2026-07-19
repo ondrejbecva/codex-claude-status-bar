@@ -85,6 +85,7 @@ function createServiceSection() {
 }
 
 const MODE_LABELS = {
+    'combined': 'Combined 5h / 7d',
     'min': 'All (minimum)',
     'claude-session': 'Claude Session',
     'claude-weekly': 'Claude Weekly',
@@ -283,7 +284,7 @@ class UsageIndicator extends PanelMenu.Button {
 
         const footerRow = new St.BoxLayout({style_class: 'usage-footer-row'});
         footerRow.set_x_expand(true);
-        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.0.0'});
+        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.1.0'});
         this._nextUpdateLabel = new St.Label({text: 'Next update in --'});
         const footerSpacer = new St.Widget();
         footerSpacer.set_x_expand(true);
