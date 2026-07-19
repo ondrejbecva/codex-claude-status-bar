@@ -48,6 +48,19 @@ data. It works with both the old and new schema shapes. See
 
 ## Install
 
+### Quick install on a new machine (prebuilt zip)
+
+Download the latest release zip and install it — no clone, no build:
+
+```bash
+curl -LO https://github.com/ondrejbecva/codex-claude-status-bar/releases/latest/download/codex-claude-status-bar@ondrejbecva.cz.shell-extension.zip
+gnome-extensions install --force codex-claude-status-bar@ondrejbecva.cz.shell-extension.zip
+gnome-extensions enable codex-claude-status-bar@ondrejbecva.cz
+```
+
+Then **log out and back in** (Wayland). Sign in to the Claude Code / Codex CLIs
+at least once so their credential files exist.
+
 ### From source (recommended for development)
 
 ```bash
