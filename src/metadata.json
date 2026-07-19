@@ -2,7 +2,7 @@
   "uuid": "codex-claude-status-bar@ondrejbecva.cz",
   "name": "Codex Claude Status Bar",
   "description": "Track Claude and Codex AI usage limits (session + weekly) in the GNOME top panel. Fork of brainusage by AltairInglorious with an updated Codex usage-API schema parser.",
-  "version": 2,
+  "version": 3,
   "shell-version": [
     "45",
     "46",
