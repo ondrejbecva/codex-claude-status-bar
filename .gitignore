@@ -1,0 +1,10 @@
+# Build artifacts
+dist/
+*.shell-extension.zip
+
+# Compiled GSettings schema (regenerated on install)
+src/schemas/gschemas.compiled
+
+# Editor / OS cruft
+.DS_Store
+*.swp

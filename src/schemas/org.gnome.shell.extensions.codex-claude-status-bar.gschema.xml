@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.codex-claude-status-bar"
+          path="/org/gnome/shell/extensions/codex-claude-status-bar/">
+    <key name="panel-label-mode" type="s">
+      <default>'min'</default>
+      <summary>Which metric to show in the panel (legacy single-metric mode)</summary>
+      <description>
+        Used only when panel-layout is 'single'. Options: min, claude-session,
+        claude-weekly, codex-session, codex-weekly
+      </description>
+    </key>
+    <key name="panel-layout" type="s">
+      <default>'per-provider'</default>
+      <summary>Panel layout</summary>
+      <description>
+        'per-provider' shows each provider's icon plus 5h and 7d percentages.
+        'single' falls back to the legacy single-percentage display controlled
+        by panel-label-mode.
+      </description>
+    </key>
+    <key name="panel-colorize" type="b">
+      <default>true</default>
+      <summary>Color the panel percentages by remaining %</summary>
+      <description>
+        When true, panel percentages render green above 50% and smoothly fade
+        through yellow to red as remaining drops below 50%.
+      </description>
+    </key>
+    <key name="claude-icon" type="s">
+      <default>'star'</default>
+      <summary>Which Claude icon to show in the panel</summary>
+      <description>
+        'star' uses the Anthropic Claude starburst mark. 'code' uses the Claude
+        Code bracketed-dots mark.
+      </description>
+    </key>
+    <key name="icon-style" type="s">
+      <default>'color'</default>
+      <summary>Icon style</summary>
+      <description>
+        'color' uses brand colors. 'mono' uses a single panel-friendly grey
+        (#cdd6f4) so the icons blend with the rest of the GNOME top bar.
+      </description>
+    </key>
+  </schema>
+</schemalist>

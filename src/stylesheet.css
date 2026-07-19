@@ -1,0 +1,117 @@
+/* Top-bar panel layout */
+.usage-panel-box {
+    spacing: 4px;
+}
+.usage-panel-group {
+    spacing: 4px;
+}
+.usage-panel-icon {
+    width: 16px;
+    height: 16px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin: 0 2px 0 0;
+}
+.usage-panel-pct {
+    font-size: 12px;
+    font-feature-settings: "tnum";
+}
+.usage-panel-sep {
+    color: rgba(205, 214, 244, 0.45);
+}
+.usage-panel-divider {
+    color: rgba(205, 214, 244, 0.3);
+    padding: 0 2px;
+}
+.usage-panel-fallback {
+    font-size: 13px;
+}
+
+/* Popup Container */
+.usage-popup-box {
+    padding: 16px;
+    min-width: 340px;
+    spacing: 12px;
+}
+
+/* Service Card — subtle background for visual grouping */
+.usage-service-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    spacing: 4px;
+}
+
+/* Service Header */
+.usage-service-header {
+    spacing: 8px;
+}
+.usage-service-name {
+    font-size: 15px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* Window Row */
+.usage-window-row {
+    margin-top: 8px;
+    spacing: 4px;
+}
+.usage-window-label {
+    font-size: 13px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* Progress Bar Track — dark-aware translucent */
+.usage-progress-track {
+    height: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Progress Bar Fill — color-coded by health status */
+.usage-fill-green {
+    height: 10px;
+    background-color: #22c55e;
+    border-radius: 5px;
+}
+.usage-fill-yellow {
+    height: 10px;
+    background-color: #eab308;
+    border-radius: 5px;
+}
+.usage-fill-red {
+    height: 10px;
+    background-color: #ef4444;
+    border-radius: 5px;
+}
+
+/* Info Row — high-contrast secondary text */
+.usage-info-row {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Separator — barely-visible hairline */
+.usage-separator {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.08);
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* Footer */
+.usage-footer-row {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Warning */
+.usage-warning {
+    font-size: 12px;
+    color: #f87171;
+    margin-top: 4px;
+}
