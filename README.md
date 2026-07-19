@@ -1,56 +1,70 @@
 # Codex Claude Status Bar
 
-A GNOME Shell extension that shows your **Claude** and **Codex** AI usage limits
-— session (5h) and weekly (7d) — directly in the top panel.
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GNOME Shell 45–50](https://img.shields.io/badge/GNOME%20Shell-45–50-4A86CF?logo=gnome&logoColor=white)](https://gjs.guide/extensions/)
+[![Latest release](https://img.shields.io/github/v/release/ondrejbecva/codex-claude-status-bar?label=release)](https://github.com/ondrejbecva/codex-claude-status-bar/releases/latest)
 
-Panel looks like: `Claude 5h X% / 7d Y%  │  Codex 5h X% / 7d Y%`
+**Keep an eye on how much of your Claude and Codex AI quota is left — right from
+the GNOME top bar.** This extension polls both providers' official usage
+endpoints and shows the remaining percentage for each rate-limit window
+(5-hour session and 7-day weekly), colour-coded green → yellow → red, with a
+click-through breakdown and low-quota notifications. No API keys, no config: it
+reads the credential files the Claude Code and Codex CLIs already write.
+
+```
+ Claude 5h 65% / 7d 52%  │  Codex 5h -- / 7d 100%
+```
 
 > **Fork of [`brainusage`](https://github.com/AltairInglorious/brainusage) by
-> AltairInglorious** (MIT). This fork exists to fix Codex reporting after OpenAI
-> changed its usage API — see [What's different](#whats-different).
+> AltairInglorious** (MIT). Created to fix Codex reporting after OpenAI changed
+> its usage API, then extended with a combined panel mode and Claude Fable
+> tracking — see [What's different](#whats-different).
 
-## What it does
+---
 
-- Polls Claude and Codex usage endpoints on an interval.
-- Panel shows remaining % per provider, colour-coded green → yellow → red.
-- Click the indicator for a breakdown popup (per-window %, reset countdown),
-  a manual **Refresh**, icon-style toggles, and layout options.
-- Desktop notification when a window crosses a low-remaining threshold.
+## Features
 
-Credentials are read from the files the official CLIs already write — nothing to
-configure:
+- **Both providers, both windows** — Claude and Codex, session (5h) + weekly (7d).
+- **At-a-glance colour** — green ≥ 70 %, yellow ≥ 30 %, red below.
+- **Detail popup** — per-window remaining %, reset countdown, manual refresh.
+- **Flexible panel** — show both providers side by side, one combined
+  `5h / 7d`, or any single metric you pick.
+- **Claude Fable** — optional row + top-bar segment for Claude's model-scoped
+  Fable weekly cap.
+- **Low-quota alerts** — desktop notification when a window drops below 20 %.
+- **Zero setup** — no keys to paste; credentials come from the CLIs.
 
-| Provider | Credentials file      |
-| -------- | --------------------- |
-| Claude   | `~/.claude*` (OAuth)  |
-| Codex    | `~/.codex/auth.json`  |
+## Supported platforms
 
-## What's different
+| | Supported |
+| --- | --- |
+| **Desktop** | GNOME Shell **45 – 50** |
+| **Display server** | Wayland **and** X11 |
+| **Distros** | Any with GNOME 45+ — e.g. Ubuntu 24.04 / 25.04, Fedora 40+, Debian 13, Arch |
+| **Architecture** | Any (pure GJS/JavaScript — no native code) |
 
-OpenAI changed the Codex usage schema
-(`https://chatgpt.com/backend-api/wham/usage`). The response now delivers the
-**7-day weekly window as `primary_window`** (`limit_window_seconds: 604800`) and
-often leaves `secondary_window: null`. Upstream assumed a fixed layout
-(`primary_window` = 5h session, `secondary_window` = 7d weekly) and hard-failed
-with `partial_data` whenever the secondary window was missing — so the Codex
-session/weekly readouts were mislabelled and the weekly bar stuck at 0 % / red.
+Not supported: KDE Plasma / other desktops, macOS, Windows — this is a GNOME
+Shell extension. The fetch-and-parse core (`src/lib/`) is plain JavaScript and
+portable, so a menu-bar port (e.g. xbar/SwiftBar on macOS) is feasible but not
+included here.
 
-This fork rewrites `normalizeCodexUsage` to **classify each window by its own
-`limit_window_seconds`** (< 1 day → session, ≥ 1 day → weekly) instead of trusting
-slot position, and treats a single-window response as valid rather than partial
-data. It works with both the old and new schema shapes. See
-`src/lib/core/normalize.js`.
+> **Wayland note:** GNOME Shell can't hot-reload extension code on Wayland, so a
+> newly installed or updated version loads after you **log out and back in**
+> (on X11 you can instead run `Alt`+`F2` → `r`).
 
 ## Requirements
 
-- GNOME Shell 45–50 (Wayland or X11)
-- `glib-compile-schemas` (from `glib2` / `libglib2.0-dev`)
+- GNOME Shell 45–50
+- `glib-compile-schemas` (ships with GLib — `glib2` on Fedora/Arch,
+  `libglib2.0-bin` on Debian/Ubuntu; usually already present)
+- A signed-in **Claude Code** and/or **Codex** CLI (so the credential files
+  exist). Either one alone works; the other provider just stays hidden.
 
 ## Install
 
-### Quick install on a new machine (prebuilt zip)
+### Quick install (prebuilt zip)
 
-Download the latest release zip and install it — no clone, no build:
+No clone, no build:
 
 ```bash
 curl -LO https://github.com/ondrejbecva/codex-claude-status-bar/releases/latest/download/codex-claude-status-bar@ondrejbecva.cz.shell-extension.zip
@@ -58,69 +72,79 @@ gnome-extensions install --force codex-claude-status-bar@ondrejbecva.cz.shell-ex
 gnome-extensions enable codex-claude-status-bar@ondrejbecva.cz
 ```
 
-Then **log out and back in** (Wayland). Sign in to the Claude Code / Codex CLIs
-at least once so their credential files exist.
+Then **log out and back in**.
 
-### From source (recommended for development)
+### From source
 
 ```bash
 git clone https://github.com/ondrejbecva/codex-claude-status-bar.git
 cd codex-claude-status-bar
-./install.sh
+./install.sh          # copies to ~/.local/share/…, compiles the schema, enables
 ```
 
-Then **log out and back in** (Wayland cannot hot-reload extension code; on X11
-you can `Alt+F2` → `r`). Enable it if needed:
+Log out and back in. Uninstall with `./uninstall.sh`.
+
+### Build a zip yourself
 
 ```bash
-gnome-extensions enable codex-claude-status-bar@ondrejbecva.cz
-```
-
-### As a packaged zip
-
-```bash
-./pack.sh
-gnome-extensions install --force dist/codex-claude-status-bar@ondrejbecva.cz.shell-extension.zip
-```
-
-### Uninstall
-
-```bash
-./uninstall.sh
+./pack.sh             # -> dist/codex-claude-status-bar@ondrejbecva.cz.shell-extension.zip
 ```
 
 ## Configuration
 
-Open the indicator's popup menu:
+Click the panel indicator to open the popup; the toggles live at the bottom of
+that menu:
 
-- **Per-provider panel layout** — ON (default) shows both providers side by
-  side, each with `5h X% / 7d Y%` and its icon (a provider is hidden when it has
-  no data). OFF collapses to a single label chosen in *Panel display*.
-- **Panel display** — what the single-label mode shows. Default is `combined`
-  (`5h X% / 7d Y%`, worst-case across both providers per window). Other options:
-  `min` (lowest % across everything) or a specific metric (Claude/Codex ×
-  session/weekly, plus Claude Fable).
-- **Show Claude Fable usage** — when on, the Claude panel group gains a
-  `F Z%` segment in the top bar (per-provider layout), the popup Claude section
-  gains a **Fable** row, and the *Claude Fable* single-label metric unlocks.
-  Reads Claude's model-scoped weekly cap (the `weekly_scoped` limit whose model
-  display name is "Fable"). Off by default; the top-bar segment appears only
-  when your account actually reports a Fable limit.
-- **Colorize percentages** — colour the panel numbers by remaining %.
-- **Colored icons** / **Claude icon** — brand colour vs mono; starburst vs
-  brackets mark.
+| Option | What it does |
+| --- | --- |
+| **Per-provider panel layout** | *ON (default):* both providers side by side, each `5h X% / 7d Y%` with its icon (a provider hides when it has no data). *OFF:* a single label chosen below. |
+| **Panel display** | The single-label content. Default `combined` (`5h X% / 7d Y%`, worst-case across both providers per window); or `min` (lowest % anywhere); or one specific metric (Claude/Codex × session/weekly, plus Claude Fable). |
+| **Show Claude Fable usage** | Adds a `F Z%` segment to the Claude top-bar group, a **Fable** row in the popup, and the *Claude Fable* single-label metric. Reads Claude's model-scoped weekly cap. Off by default; the top-bar segment appears only when your account reports a Fable limit. |
+| **Colorize percentages** | Colour the panel numbers by remaining %. |
+| **Colored icons** | Brand-coloured provider icons vs. a mono grey that blends with the bar. |
+| **Claude icon** | Starburst (Claude) vs. bracketed dots (Claude Code) mark. |
 
-## Layout
+## How it works
+
+Every **3 minutes** the extension refreshes each provider: it reads the local
+credential file, refreshes the OAuth access token if needed, calls the usage
+endpoint, and normalises the response into remaining-% + reset-time per window.
+
+| Provider | Credentials (read locally) | Token refresh | Usage endpoint |
+| --- | --- | --- | --- |
+| Claude | `~/.claude/.credentials.json` | `platform.claude.com` | `api.anthropic.com/api/oauth/usage` |
+| Codex  | `~/.codex/auth.json` | `auth.openai.com` | `chatgpt.com/backend-api/wham/usage` |
+
+**Privacy:** credentials never leave your machine except as the `Authorization`
+bearer on requests to those official provider endpoints. No third-party servers,
+no analytics, no telemetry.
+
+## What's different (vs. upstream brainusage)
+
+- **Codex schema fix.** OpenAI changed
+  `chatgpt.com/backend-api/wham/usage`: the 7-day weekly window now arrives as
+  `primary_window` (`limit_window_seconds: 604800`) with `secondary_window`
+  often `null`. Upstream assumed a fixed layout (`primary` = 5h, `secondary` =
+  7d) and hard-failed with `partial_data` when the secondary was missing — so
+  Codex readouts were mislabelled and the weekly bar stuck at 0 % / red. This
+  fork classifies each window by its own `limit_window_seconds` (< 1 day →
+  session, ≥ 1 day → weekly) and accepts a single-window response. Works with
+  both old and new shapes. (`src/lib/core/normalize.js`)
+- **Combined panel mode** — `5h / 7d` worst-case across both providers, now the
+  single-label default.
+- **Claude Fable** — optional tracking of Claude's model-scoped Fable weekly cap.
+
+## Project layout
 
 ```
-src/                  # the installable extension (copied to ~/.local/share/gnome-shell/extensions/<uuid>)
-  extension.js        # panel indicator + popup UI
-  lib/core/           # scheduler, state, aggregate, normalize (schema parsing), notifications
-  lib/providers/      # claude.js, codex.js — fetch + refresh tokens
-  lib/runtime/        # fetch + file-read shims
-  lib/ui/render.js    # view-model builder
-  schemas/            # GSettings schema
-  icons/              # provider SVGs
+src/                    # the installable extension (uuid: codex-claude-status-bar@ondrejbecva.cz)
+  extension.js          # panel indicator + popup UI
+  lib/core/             # scheduler, state, aggregate, normalize (schema parsing), notifications
+  lib/providers/        # claude.js, codex.js — fetch + OAuth refresh
+  lib/runtime/          # fetch + file-read shims
+  lib/ui/render.js      # view-model builder
+  schemas/              # GSettings schema
+  icons/                # provider SVGs
 install.sh  uninstall.sh  pack.sh
 ```
 
@@ -128,6 +152,6 @@ install.sh  uninstall.sh  pack.sh
 
 - Original work: **[brainusage](https://github.com/AltairInglorious/brainusage)**
   by AltairInglorious.
-- Fork, Codex schema fix, and packaging: Ondřej Bečva.
+- Fork, Codex schema fix, combined mode, Fable tracking, packaging: Ondřej Bečva.
 
 MIT — see [LICENSE](LICENSE). Both copyright notices are retained.
