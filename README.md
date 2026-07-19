@@ -100,11 +100,12 @@ Open the indicator's popup menu:
   (`5h X% / 7d Y%`, worst-case across both providers per window). Other options:
   `min` (lowest % across everything) or a specific metric (Claude/Codex ×
   session/weekly, plus Claude Fable).
-- **Show Claude Fable usage** — adds a **Fable** row to the Claude section of
-  the popup and unlocks the *Claude Fable* single-label metric. Reads Claude's
-  model-scoped weekly cap (the `weekly_scoped` limit whose model display name is
-  "Fable"). Off by default; the row only appears when your account actually
-  reports a Fable limit.
+- **Show Claude Fable usage** — when on, the Claude panel group gains a
+  `F Z%` segment in the top bar (per-provider layout), the popup Claude section
+  gains a **Fable** row, and the *Claude Fable* single-label metric unlocks.
+  Reads Claude's model-scoped weekly cap (the `weekly_scoped` limit whose model
+  display name is "Fable"). Off by default; the top-bar segment appears only
+  when your account actually reports a Fable limit.
 - **Colorize percentages** — colour the panel numbers by remaining %.
 - **Colored icons** / **Claude icon** — brand colour vs mono; starburst vs
   brackets mark.

@@ -1,4 +1,4 @@
-const VERSION = 'codex-claude-status-bar 1.2.0';
+const VERSION = 'codex-claude-status-bar 1.3.0';
 
 export const PANEL_LABEL_MODES = ['combined', 'min', 'claude-session', 'claude-weekly', 'claude-fable', 'codex-session', 'codex-weekly'];
 

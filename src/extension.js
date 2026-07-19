@@ -113,7 +113,7 @@ function iconStyleForFile(extensionPath, iconBasename) {
     return `background-image: url("file://${extensionPath}/icons/${iconBasename}");`;
 }
 
-function buildProviderPanelGroup(extensionPath, iconBasename) {
+function buildProviderPanelGroup(extensionPath, iconBasename, withFable = false) {
     const group = new St.BoxLayout({
         style_class: 'usage-panel-group',
         y_align: Clutter.ActorAlign.CENTER,
@@ -149,7 +149,28 @@ function buildProviderPanelGroup(extensionPath, iconBasename) {
     group.add_child(slash);
     group.add_child(weeklyLabel);
 
-    return {group, icon, sessionLabel, weeklyLabel};
+    const result = {group, icon, sessionLabel, weeklyLabel};
+
+    if (withFable) {
+        const fableSlash = new St.Label({
+            text: ' / ',
+            style_class: 'usage-panel-sep',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        const fableLabel = new St.Label({
+            text: '--',
+            style_class: 'usage-panel-pct',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        fableSlash.hide();
+        fableLabel.hide();
+        group.add_child(fableSlash);
+        group.add_child(fableLabel);
+        result.fableSlash = fableSlash;
+        result.fableLabel = fableLabel;
+    }
+
+    return result;
 }
 
 const UsageIndicator = GObject.registerClass(
@@ -174,7 +195,7 @@ class UsageIndicator extends PanelMenu.Button {
             y_align: Clutter.ActorAlign.CENTER,
         });
 
-        this._claudePanel = buildProviderPanelGroup(extensionPath, this._claudeIconBasename());
+        this._claudePanel = buildProviderPanelGroup(extensionPath, this._claudeIconBasename(), true);
         this._codexPanel = buildProviderPanelGroup(extensionPath, this._codexIconBasename());
 
         this._panelDivider = new St.Label({
@@ -290,7 +311,7 @@ class UsageIndicator extends PanelMenu.Button {
 
         const footerRow = new St.BoxLayout({style_class: 'usage-footer-row'});
         footerRow.set_x_expand(true);
-        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.2.0'});
+        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.3.0'});
         this._nextUpdateLabel = new St.Label({text: 'Next update in --'});
         const footerSpacer = new St.Widget();
         footerSpacer.set_x_expand(true);
@@ -449,6 +470,22 @@ class UsageIndicator extends PanelMenu.Button {
         const weeklyColor = colorize ? pctColor(weeklyWindow.remainingPct) : '';
         panel.sessionLabel.set_style(sessionColor ? `color: ${sessionColor};` : '');
         panel.weeklyLabel.set_style(weeklyColor ? `color: ${weeklyColor};` : '');
+
+        // Optional Fable segment (Claude group only). The Fable window is
+        // present in the view-model only when the toggle is on.
+        if (panel.fableLabel) {
+            const fableWindow = svc.windows[2];
+            if (fableWindow && !fableWindow.remainingText.startsWith('--')) {
+                panel.fableLabel.text = `F ${this._formatPctText(fableWindow)}`;
+                const fableColor = colorize ? pctColor(fableWindow.remainingPct) : '';
+                panel.fableLabel.set_style(fableColor ? `color: ${fableColor};` : '');
+                panel.fableSlash.show();
+                panel.fableLabel.show();
+            } else {
+                panel.fableSlash.hide();
+                panel.fableLabel.hide();
+            }
+        }
     }
 
     _updatePanel(vm) {
