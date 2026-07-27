@@ -2,22 +2,43 @@
 <schemalist>
   <schema id="org.gnome.shell.extensions.codex-claude-status-bar"
           path="/org/gnome/shell/extensions/codex-claude-status-bar/">
-    <key name="panel-label-mode" type="s">
-      <default>'combined'</default>
-      <summary>Which metric to show in the panel (single-label mode)</summary>
+    <key name="notify-window-reset" type="b">
+      <default>true</default>
+      <summary>Notify when a usage window resets</summary>
       <description>
-        Used only when panel-layout is 'single'. Options: combined (worst-case
-        5h / 7d across both providers), min, claude-session, claude-weekly,
-        codex-session, codex-weekly
+        When true, a desktop notification fires once a 5h or 7d window hands its
+        quota back (detected as a jump in remaining %, since Codex's reset
+        timestamp slides forward while the window is unused).
       </description>
     </key>
-    <key name="panel-layout" type="s">
-      <default>'per-provider'</default>
-      <summary>Panel layout</summary>
+    <key name="show-claude" type="b">
+      <default>true</default>
+      <summary>Show the Claude group in the panel</summary>
       <description>
-        'per-provider' shows each provider's icon plus 5h and 7d percentages.
-        'single' falls back to the legacy single-percentage display controlled
-        by panel-label-mode.
+        When false, the Claude icon and percentages are hidden from the top bar.
+        The Claude section stays in the popup.
+      </description>
+    </key>
+    <key name="show-codex" type="b">
+      <default>true</default>
+      <summary>Show the Codex group in the panel</summary>
+      <description>
+        When false, the Codex icon and percentages are hidden from the top bar.
+        The Codex section stays in the popup.
+      </description>
+    </key>
+    <key name="claude-panel-windows" type="s">
+      <default>'both'</default>
+      <summary>Which Claude windows to show in the panel</summary>
+      <description>
+        'both' shows 5h and 7d, 'session' shows only 5h, 'weekly' shows only 7d.
+      </description>
+    </key>
+    <key name="codex-panel-windows" type="s">
+      <default>'both'</default>
+      <summary>Which Codex windows to show in the panel</summary>
+      <description>
+        'both' shows 5h and 7d, 'session' shows only 5h, 'weekly' shows only 7d.
       </description>
     </key>
     <key name="panel-colorize" type="b">
@@ -41,7 +62,7 @@
       <summary>Show Claude Fable model-scoped usage</summary>
       <description>
         When true, adds a "Fable" usage row to the Claude section of the popup
-        and enables the Claude Fable metric for the single-label panel. Reads the
+        and an extra Fable percentage to the Claude panel group. Reads the
         model-scoped weekly limit whose model display name is "Fable".
       </description>
     </key>

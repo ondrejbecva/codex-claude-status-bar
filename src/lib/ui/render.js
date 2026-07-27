@@ -1,55 +1,4 @@
-const VERSION = 'codex-claude-status-bar 1.3.0';
-
-export const PANEL_LABEL_MODES = ['combined', 'min', 'claude-session', 'claude-weekly', 'claude-fable', 'codex-session', 'codex-weekly'];
-
-function getPanelLabelValue(summary, mode) {
-    if (mode === 'min' || !mode)
-        return summary?.minRemainingPct;
-
-    const providers = summary?.providers;
-    if (!providers)
-        return undefined;
-
-    switch (mode) {
-        case 'claude-session': return providers.claude?.data?.sessionRemainingPct;
-        case 'claude-weekly':  return providers.claude?.data?.weeklyRemainingPct;
-        case 'claude-fable':   return providers.claude?.data?.fableRemainingPct;
-        case 'codex-session':  return providers.codex?.data?.sessionRemainingPct;
-        case 'codex-weekly':   return providers.codex?.data?.weeklyRemainingPct;
-        default: return summary?.minRemainingPct;
-    }
-}
-
-function minFinite(values) {
-    const finite = values.filter(Number.isFinite);
-    return finite.length > 0 ? Math.min(...finite) : undefined;
-}
-
-// Combined single-label mode: fold both providers into one 5h/7d readout,
-// taking the worst (lowest remaining) across providers for each window.
-function buildCombinedPanelLabel(summary) {
-    const claude = summary?.providers?.claude?.data;
-    const codex = summary?.providers?.codex?.data;
-
-    const session = minFinite([claude?.sessionRemainingPct, codex?.sessionRemainingPct]);
-    const weekly = minFinite([claude?.weeklyRemainingPct, codex?.weeklyRemainingPct]);
-
-    return `5h ${formatPercent(session)} / 7d ${formatPercent(weekly)}`;
-}
-
-function buildPanelLabel(summary, mode) {
-    if (mode === 'combined' || !mode)
-        return buildCombinedPanelLabel(summary);
-
-    return formatPercent(getPanelLabelValue(summary, mode));
-}
-
-function formatPercent(value) {
-    if (!Number.isFinite(value))
-        return '--';
-
-    return `${Math.round(value)}%`;
-}
+const VERSION = 'codex-claude-status-bar 1.4.0';
 
 export function getDotColor(pct) {
     if (!Number.isFinite(pct))
@@ -191,14 +140,12 @@ export function buildUsageViewModel(summary, deps = {}) {
     const now = deps.now ?? Date.now();
     const version = deps.version ?? VERSION;
     const pollIntervalMs = deps.pollIntervalMs ?? 180_000;
-    const panelLabelMode = deps.panelLabelMode ?? 'combined';
     const showClaudeFable = deps.showClaudeFable ?? false;
 
     const claude = summary?.providers?.claude ?? null;
     const codex = summary?.providers?.codex ?? null;
 
     return {
-        panelLabel: buildPanelLabel(summary, panelLabelMode),
         services: [
             buildServiceViewModel('Codex', codex?.data, codex?.code, now),
             buildServiceViewModel('Claude', claude?.data, claude?.code, now, {includeFable: showClaudeFable}),
