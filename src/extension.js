@@ -5,6 +5,7 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -15,7 +16,7 @@ import {createClaudeProvider} from './lib/providers/claude.js';
 import {createCodexProvider} from './lib/providers/codex.js';
 import {readTextFile} from './lib/runtime/fs.js';
 import {createFetch} from './lib/runtime/fetch.js';
-import {buildUsageViewModel, PANEL_LABEL_MODES} from './lib/ui/render.js';
+import {buildUsageViewModel} from './lib/ui/render.js';
 
 const FILL_CLASSES = {
     green: 'usage-fill-green',
@@ -85,16 +86,6 @@ function createServiceSection(windowCount = 2) {
     return {container, nameLabel, windows, warningLabel};
 }
 
-const MODE_LABELS = {
-    'combined': 'Combined 5h / 7d',
-    'min': 'All (minimum)',
-    'claude-session': 'Claude Session',
-    'claude-weekly': 'Claude Weekly',
-    'claude-fable': 'Claude Fable',
-    'codex-session': 'Codex Session',
-    'codex-weekly': 'Codex Weekly',
-};
-
 function pctColor(pct) {
     if (!Number.isFinite(pct))
         return '';
@@ -149,7 +140,7 @@ function buildProviderPanelGroup(extensionPath, iconBasename, withFable = false)
     group.add_child(slash);
     group.add_child(weeklyLabel);
 
-    const result = {group, icon, sessionLabel, weeklyLabel};
+    const result = {group, icon, sessionLabel, slash, weeklyLabel};
 
     if (withFable) {
         const fableSlash = new St.Label({
@@ -183,7 +174,6 @@ class UsageIndicator extends PanelMenu.Button {
         this._extensionPath = extensionPath;
         this._lastSummary = null;
         this._timerSourceId = 0;
-        this._modeItems = [];
 
         this._outerBox = new St.BoxLayout({
             style_class: 'usage-panel-outer',
@@ -224,19 +214,20 @@ class UsageIndicator extends PanelMenu.Button {
         this._buildPopup();
         this._startRelativeTimeTimer();
 
-        this._settingsChangedId = this._settings.connect('changed::panel-label-mode', () => {
-            this._updateOrnaments();
-            this._refreshRelativeTimes();
-        });
-        this._layoutChangedId = this._settings.connect('changed::panel-layout', () => {
-            this._refreshRelativeTimes();
-        });
-        this._colorizeChangedId = this._settings.connect('changed::panel-colorize', () => {
-            this._refreshRelativeTimes();
-        });
-        this._fableChangedId = this._settings.connect('changed::show-claude-fable', () => {
-            this._refreshRelativeTimes();
-        });
+        this._panelSettingIds = [];
+        for (const key of [
+            'panel-colorize',
+            'show-claude-fable',
+            'show-claude',
+            'show-codex',
+            'claude-panel-windows',
+            'codex-panel-windows',
+        ]) {
+            this._panelSettingIds.push(this._settings.connect(`changed::${key}`, () => {
+                this._updateProviderOrnaments();
+                this._refreshRelativeTimes();
+            }));
+        }
         this._claudeIconChangedId = this._settings.connect('changed::claude-icon', () => {
             this._refreshIconStyles();
             this._updateClaudeIconOrnaments();
@@ -354,40 +345,97 @@ class UsageIndicator extends PanelMenu.Button {
         this._colorizeItem = colorizeItem;
         this.menu.addMenuItem(colorizeItem);
 
-        const layoutItem = new PopupMenu.PopupSwitchMenuItem(
-            'Per-provider panel layout',
-            this._settings.get_string('panel-layout') === 'per-provider',
+        const resetNotifyItem = new PopupMenu.PopupSwitchMenuItem(
+            'Notify on limit reset',
+            this._settings.get_boolean('notify-window-reset'),
         );
-        this._layoutToggleSignalId = layoutItem.connect('toggled', (_item, state) => {
-            this._settings.set_string('panel-layout', state ? 'per-provider' : 'single');
+        this._resetNotifyToggleSignalId = resetNotifyItem.connect('toggled', (_item, state) => {
+            this._settings.set_boolean('notify-window-reset', state);
         });
-        this._layoutItem = layoutItem;
-        this.menu.addMenuItem(layoutItem);
+        this._resetNotifyItem = resetNotifyItem;
+        this.menu.addMenuItem(resetNotifyItem);
+
+        this._windowItems = {};
+        this._showItems = {};
+
+        this._claudeSubmenu = this._buildProviderSubmenu({
+            title: 'Claude',
+            provider: 'claude',
+            showKey: 'show-claude',
+            windowsKey: 'claude-panel-windows',
+            extras: submenu => this._addClaudeExtras(submenu),
+        });
+        this._codexSubmenu = this._buildProviderSubmenu({
+            title: 'Codex',
+            provider: 'codex',
+            showKey: 'show-codex',
+            windowsKey: 'codex-panel-windows',
+        });
+    }
+
+    // One submenu per provider: whether it appears in the top bar at all, and
+    // which of its windows are shown there.
+    _buildProviderSubmenu({title, provider, showKey, windowsKey, extras}) {
+        const submenu = new PopupMenu.PopupSubMenuMenuItem(title);
+
+        const showItem = new PopupMenu.PopupSwitchMenuItem(
+            'Show in top bar',
+            this._settings.get_boolean(showKey),
+        );
+        showItem.connect('toggled', (_item, state) => {
+            this._settings.set_boolean(showKey, state);
+        });
+        this._showItems[provider] = showItem;
+        submenu.menu.addMenuItem(showItem);
+
+        submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        const options = [
+            {key: 'both', label: '5h + 7d'},
+            {key: 'session', label: '5h only'},
+            {key: 'weekly', label: '7d only'},
+        ];
+
+        this._windowItems[provider] = [];
+        for (const opt of options) {
+            const item = new PopupMenu.PopupMenuItem(opt.label);
+            item._windowsKey = opt.key;
+            item.connect('activate', () => {
+                this._settings.set_string(windowsKey, opt.key);
+            });
+            this._windowItems[provider].push(item);
+            submenu.menu.addMenuItem(item);
+        }
+        this._updateWindowOrnaments(provider, windowsKey);
+
+        extras?.(submenu);
+
+        this.menu.addMenuItem(submenu);
+        return submenu;
+    }
+
+    _addClaudeExtras(submenu) {
+        submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         const fableItem = new PopupMenu.PopupSwitchMenuItem(
-            'Show Claude Fable usage',
+            'Show Fable usage',
             this._settings.get_boolean('show-claude-fable'),
         );
         this._fableToggleSignalId = fableItem.connect('toggled', (_item, state) => {
             this._settings.set_boolean('show-claude-fable', state);
         });
         this._fableItem = fableItem;
-        this.menu.addMenuItem(fableItem);
+        submenu.menu.addMenuItem(fableItem);
 
-        this._buildClaudeIconSubmenu();
-        this._buildDisplaySubmenu();
-    }
+        submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-    _buildClaudeIconSubmenu() {
-        const submenu = new PopupMenu.PopupSubMenuMenuItem('Claude icon');
         this._claudeIconItems = [];
-
-        const options = [
-            {key: 'star', label: 'Claude (starburst)'},
-            {key: 'code', label: 'Claude Code (brackets)'},
+        const icons = [
+            {key: 'star', label: 'Icon: Claude (starburst)'},
+            {key: 'code', label: 'Icon: Claude Code (brackets)'},
         ];
 
-        for (const opt of options) {
+        for (const opt of icons) {
             const item = new PopupMenu.PopupMenuItem(opt.label);
             item._iconKey = opt.key;
             item.connect('activate', () => {
@@ -397,44 +445,33 @@ class UsageIndicator extends PanelMenu.Button {
             submenu.menu.addMenuItem(item);
         }
 
-        this._claudeIconSubmenu = submenu;
-        this.menu.addMenuItem(submenu);
         this._updateClaudeIconOrnaments();
     }
 
-    _buildDisplaySubmenu() {
-        this._displaySubmenu = new PopupMenu.PopupSubMenuMenuItem('Panel display');
-        this._modeItems = [];
-
-        for (const mode of PANEL_LABEL_MODES) {
-            const item = new PopupMenu.PopupMenuItem(MODE_LABELS[mode] ?? mode);
-            item._modeKey = mode;
-            item.connect('activate', () => {
-                this._settings.set_string('panel-label-mode', mode);
-                // Picking a single-metric mode implies the user wants the
-                // legacy single-label panel; force the layout to match so
-                // the choice is actually visible.
-                this._settings.set_string('panel-layout', 'single');
-                if (this._layoutItem)
-                    this._layoutItem.setToggleState(false);
-            });
-            this._modeItems.push(item);
-            this._displaySubmenu.menu.addMenuItem(item);
-        }
-
-        this._updateOrnaments();
-        this.menu.addMenuItem(this._displaySubmenu);
-    }
-
-    _updateOrnaments() {
-        const current = this._settings.get_string('panel-label-mode');
-        for (const item of this._modeItems) {
+    _updateWindowOrnaments(provider, windowsKey) {
+        const current = this._settings.get_string(windowsKey);
+        for (const item of this._windowItems[provider] ?? []) {
             item.setOrnament(
-                item._modeKey === current
+                item._windowsKey === current
                     ? PopupMenu.Ornament.DOT
                     : PopupMenu.Ornament.NONE,
             );
         }
+    }
+
+    // Keep the menu in sync when a key changes from outside (dconf, another
+    // toggle in this menu).
+    _updateProviderOrnaments() {
+        if (!this._windowItems)
+            return;
+
+        this._updateWindowOrnaments('claude', 'claude-panel-windows');
+        this._updateWindowOrnaments('codex', 'codex-panel-windows');
+
+        this._showItems.claude?.setToggleState(this._settings.get_boolean('show-claude'));
+        this._showItems.codex?.setToggleState(this._settings.get_boolean('show-codex'));
+        this._fableItem?.setToggleState(this._settings.get_boolean('show-claude-fable'));
+        this._colorizeItem?.setToggleState(this._settings.get_boolean('panel-colorize'));
     }
 
     _startRelativeTimeTimer() {
@@ -448,8 +485,12 @@ class UsageIndicator extends PanelMenu.Button {
         );
     }
 
+    _hasWindowData(window) {
+        return Boolean(window) && !window.remainingText.startsWith('--');
+    }
+
     _hasData(svc) {
-        return svc?.windows?.some(w => !w.remainingText.startsWith('--')) ?? false;
+        return svc?.windows?.some(w => this._hasWindowData(w)) ?? false;
     }
 
     _formatPctText(window) {
@@ -459,17 +500,28 @@ class UsageIndicator extends PanelMenu.Button {
         return `${window.remainingPct}%`;
     }
 
-    _applyPanelGroup(panel, svc, label5h, label7d, colorize) {
+    _applyPanelGroup(panel, svc, colorize, windowsMode) {
         const sessionWindow = svc.windows[0];
         const weeklyWindow = svc.windows[1];
 
-        panel.sessionLabel.text = `${label5h} ${this._formatPctText(sessionWindow)}`;
-        panel.weeklyLabel.text = `${label7d} ${this._formatPctText(weeklyWindow)}`;
+        // A window the provider does not report at all (Codex currently has no
+        // 5h window on Plus) would only ever render as "5h --", so drop it
+        // instead of parking dead text in the bar.
+        const showSession = windowsMode !== 'weekly' && this._hasWindowData(sessionWindow);
+        const showWeekly = windowsMode !== 'session' && this._hasWindowData(weeklyWindow);
+
+        panel.sessionLabel.text = `5h ${this._formatPctText(sessionWindow)}`;
+        panel.weeklyLabel.text = `7d ${this._formatPctText(weeklyWindow)}`;
 
         const sessionColor = colorize ? pctColor(sessionWindow.remainingPct) : '';
         const weeklyColor = colorize ? pctColor(weeklyWindow.remainingPct) : '';
         panel.sessionLabel.set_style(sessionColor ? `color: ${sessionColor};` : '');
         panel.weeklyLabel.set_style(weeklyColor ? `color: ${weeklyColor};` : '');
+
+        panel.sessionLabel.visible = showSession;
+        panel.weeklyLabel.visible = showWeekly;
+        // The separator only earns its place between two visible percentages.
+        panel.slash.visible = showSession && showWeekly;
 
         // Optional Fable segment (Claude group only). The Fable window is
         // present in the view-model only when the toggle is on.
@@ -486,19 +538,26 @@ class UsageIndicator extends PanelMenu.Button {
                 panel.fableLabel.hide();
             }
         }
+
+        return showSession || showWeekly || Boolean(panel.fableLabel?.visible);
+    }
+
+    // Returns whether the group ended up with anything to show.
+    _applyProviderPanel(panel, svc, colorize, showKey, windowsKey) {
+        if (!this._settings.get_boolean(showKey) || !this._hasData(svc)) {
+            panel.group.hide();
+            return false;
+        }
+
+        const visible = this._applyPanelGroup(
+            panel, svc, colorize, this._settings.get_string(windowsKey),
+        );
+        panel.group.visible = visible;
+        return visible;
     }
 
     _updatePanel(vm) {
-        const layout = this._settings.get_string('panel-layout');
         const colorize = this._settings.get_boolean('panel-colorize');
-
-        if (layout !== 'per-provider') {
-            this._panelBox.hide();
-            this._fallbackLabel.show();
-            this._fallbackLabel.text = vm.panelLabel;
-            this._fallbackLabel.set_style('');
-            return;
-        }
 
         this._fallbackLabel.hide();
         this._panelBox.show();
@@ -506,26 +565,16 @@ class UsageIndicator extends PanelMenu.Button {
         const codex = vm.services[0];
         const claude = vm.services[1];
 
-        const claudeHasData = this._hasData(claude);
-        const codexHasData = this._hasData(codex);
+        const showClaude = this._applyProviderPanel(
+            this._claudePanel, claude, colorize, 'show-claude', 'claude-panel-windows',
+        );
+        const showCodex = this._applyProviderPanel(
+            this._codexPanel, codex, colorize, 'show-codex', 'codex-panel-windows',
+        );
 
-        if (claudeHasData) {
-            this._claudePanel.group.show();
-            this._applyPanelGroup(this._claudePanel, claude, '5h', '7d', colorize);
-        } else {
-            this._claudePanel.group.hide();
-        }
+        this._panelDivider.visible = showClaude && showCodex;
 
-        if (codexHasData) {
-            this._codexPanel.group.show();
-            this._applyPanelGroup(this._codexPanel, codex, '5h', '7d', colorize);
-        } else {
-            this._codexPanel.group.hide();
-        }
-
-        this._panelDivider.visible = claudeHasData && codexHasData;
-
-        if (!claudeHasData && !codexHasData) {
+        if (!showClaude && !showCodex) {
             this._panelBox.hide();
             this._fallbackLabel.show();
             this._fallbackLabel.text = '--';
@@ -533,13 +582,12 @@ class UsageIndicator extends PanelMenu.Button {
     }
 
     _refreshRelativeTimes() {
-        // Always rebuild — even with null summary we still want panel layout
+        // Always rebuild — even with null summary we still want setting
         // toggles to take effect (otherwise toggling on a fresh shell leaves
         // the bar blank until the next scheduler tick).
         this._applyViewModel(buildUsageViewModel(this._lastSummary, {
             now: Date.now(),
             pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
-            panelLabelMode: this._settings.get_string('panel-label-mode'),
             showClaudeFable: this._settings.get_boolean('show-claude-fable'),
         }));
     }
@@ -549,7 +597,6 @@ class UsageIndicator extends PanelMenu.Button {
         this._applyViewModel(buildUsageViewModel(summary, {
             now: Date.now(),
             pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
-            panelLabelMode: this._settings.get_string('panel-label-mode'),
             showClaudeFable: this._settings.get_boolean('show-claude-fable'),
         }));
     }
@@ -615,24 +662,10 @@ class UsageIndicator extends PanelMenu.Button {
             this._refreshSignalId = null;
         }
 
-        if (this._settingsChangedId && this._settings) {
-            this._settings.disconnect(this._settingsChangedId);
-            this._settingsChangedId = null;
-        }
-
-        if (this._layoutChangedId && this._settings) {
-            this._settings.disconnect(this._layoutChangedId);
-            this._layoutChangedId = null;
-        }
-
-        if (this._colorizeChangedId && this._settings) {
-            this._settings.disconnect(this._colorizeChangedId);
-            this._colorizeChangedId = null;
-        }
-
-        if (this._fableChangedId && this._settings) {
-            this._settings.disconnect(this._fableChangedId);
-            this._fableChangedId = null;
+        if (this._panelSettingIds && this._settings) {
+            for (const id of this._panelSettingIds)
+                this._settings.disconnect(id);
+            this._panelSettingIds = [];
         }
 
         if (this._claudeIconChangedId && this._settings) {
@@ -660,9 +693,9 @@ class UsageIndicator extends PanelMenu.Button {
             this._fableToggleSignalId = null;
         }
 
-        if (this._layoutToggleSignalId && this._layoutItem) {
-            this._layoutItem.disconnect(this._layoutToggleSignalId);
-            this._layoutToggleSignalId = null;
+        if (this._resetNotifyToggleSignalId && this._resetNotifyItem) {
+            this._resetNotifyItem.disconnect(this._resetNotifyToggleSignalId);
+            this._resetNotifyToggleSignalId = null;
         }
 
         this._settings = null;
@@ -684,10 +717,13 @@ export default class UsageLimitsExtension extends Extension {
             fetch: fetchImpl,
             readTextFile: fileReader,
         });
+        this._settings = this.getSettings();
+
         this._thresholdNotifier = createThresholdNotifier({
-            notifyFn: (title, body) => {
-                Main.notify(title, body);
+            notifyFn: (title, body, providerKey) => {
+                this._notify(title, body, providerKey);
             },
+            shouldNotifyReset: () => this._settings?.get_boolean('notify-window-reset') ?? true,
         });
 
         this._scheduler = createScheduler({
@@ -698,16 +734,59 @@ export default class UsageLimitsExtension extends Extension {
             },
         });
 
-        this._settings = this.getSettings();
         this._indicator = new UsageIndicator(this._scheduler, this._settings, this.path);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
         this._scheduler.start();
+    }
+
+    // Main.notify() posts to the shell's generic system source, which cannot
+    // carry a custom icon — own the source so notifications wear the provider's
+    // mark instead of the default bell.
+    _notificationIcon(providerKey) {
+        const basename = providerKey === 'codex'
+            ? 'codex.svg'
+            : this._settings?.get_string('claude-icon') === 'code'
+                ? 'claude-code.svg'
+                : 'claude-star.svg';
+
+        return Gio.icon_new_for_string(`${this.path}/icons/${basename}`);
+    }
+
+    _ensureNotificationSource() {
+        if (this._notificationSource)
+            return this._notificationSource;
+
+        const source = new MessageTray.Source({
+            title: 'AI usage limits',
+            icon: this._notificationIcon('claude'),
+        });
+        source.connect('destroy', () => {
+            this._notificationSource = null;
+        });
+
+        Main.messageTray.add(source);
+        this._notificationSource = source;
+        return source;
+    }
+
+    _notify(title, body, providerKey) {
+        const source = this._ensureNotificationSource();
+
+        source.addNotification(new MessageTray.Notification({
+            source,
+            title,
+            body,
+            gicon: this._notificationIcon(providerKey),
+        }));
     }
 
     disable() {
         this._scheduler?.stop();
         this._scheduler = null;
         this._thresholdNotifier = null;
+
+        this._notificationSource?.destroy();
+        this._notificationSource = null;
 
         this._fetchRuntime?.dispose();
         this._fetchRuntime = null;
