@@ -1,0 +1,11 @@
+{
+  "name": "codex-claude-status-bar",
+  "version": "1.4.0",
+  "description": "Platform-free core for tracking Claude and Codex AI usage limits, plus per-platform status-bar shells.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'test/*.test.js'"
+  }
+}
