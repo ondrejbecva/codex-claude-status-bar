@@ -11,13 +11,16 @@ endpoints and shows the remaining percentage for each rate-limit window
 click-through breakdown and low-quota notifications. No API keys, no config: it
 reads the credential files the Claude Code and Codex CLIs already write.
 
-```
- Claude 5h 65% / 7d 52%  │  Codex 5h -- / 7d 100%
-```
+<p align="center">
+  <img src="docs/screenshot-panel.png" alt="The top bar: Claude 5h 90% / 7d 95%, Codex 7d 100%" width="560">
+</p>
 
 <p align="center">
   <img src="docs/screenshot-popup.png" alt="The popup: per-window remaining %, reset countdowns, and the settings section" width="380">
 </p>
+
+*Above: Codex shows only `7d` because OpenAI reports no 5-hour window on that
+plan — the extension drops the window instead of printing `5h --`.*
 
 > **Fork of [`brainusage`](https://github.com/AltairInglorious/brainusage) by
 > AltairInglorious** (MIT). Created to fix Codex reporting after OpenAI changed
