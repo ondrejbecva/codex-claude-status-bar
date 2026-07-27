@@ -24,6 +24,34 @@ const FILL_CLASSES = {
     red: 'usage-fill-red',
 };
 
+// Writing an identical value to an St actor still queues a relayout (text,
+// width) or a full restyle (inline style, style class), and most writes here
+// change nothing: the panel repaints every poll, the popup every minute, while
+// a percentage typically moves a few times an hour. Check before assigning.
+function setText(label, text) {
+    if (label.text !== text)
+        label.text = text;
+}
+
+// St has no cheap getter for the inline style, so cache what we last applied.
+function setInlineStyle(actor, style) {
+    if (actor._appliedStyle === style)
+        return;
+
+    actor._appliedStyle = style;
+    actor.set_style(style);
+}
+
+function setStyleClass(actor, styleClass) {
+    if (actor.style_class !== styleClass)
+        actor.style_class = styleClass;
+}
+
+function setWidth(actor, width) {
+    if (actor.width !== width)
+        actor.set_width(width);
+}
+
 function createWindowWidgets() {
     const box = new St.BoxLayout({
         vertical: true,
@@ -174,6 +202,7 @@ class UsageIndicator extends PanelMenu.Button {
         this._extensionPath = extensionPath;
         this._lastSummary = null;
         this._timerSourceId = 0;
+        this._popupBuilt = false;
 
         this._outerBox = new St.BoxLayout({
             style_class: 'usage-panel-outer',
@@ -211,8 +240,27 @@ class UsageIndicator extends PanelMenu.Button {
         this._outerBox.add_child(this._fallbackLabel);
         this.add_child(this._outerBox);
 
-        this._buildPopup();
-        this._startRelativeTimeTimer();
+        // The popup is ~65 actors that most sessions never look at, so it is
+        // built on first open. It cannot be built from 'open-state-changed':
+        // PopupMenu.open() bails out early on an empty menu, so that signal
+        // would never fire. Wrapping open() on the instance runs ahead of that
+        // check and works whichever way the menu was triggered (the click
+        // gesture PanelMenu.Button installs, or keyboard activation).
+        const openMenu = this.menu.open.bind(this.menu);
+        this.menu.open = animate => {
+            this._ensurePopup();
+            openMenu(animate);
+        };
+
+        // Only the popup carries anything that ages between polls — the reset
+        // countdowns and "next update in". Run that timer while it is on
+        // screen instead of once a minute forever.
+        this._openStateChangedId = this.menu.connect('open-state-changed', (_menu, isOpen) => {
+            if (isOpen)
+                this._startRelativeTimeTimer();
+            else
+                this._stopRelativeTimeTimer();
+        });
 
         this._panelSettingIds = [];
         for (const key of [
@@ -257,10 +305,12 @@ class UsageIndicator extends PanelMenu.Button {
     }
 
     _refreshIconStyles() {
-        this._claudePanel.icon.set_style(
+        setInlineStyle(
+            this._claudePanel.icon,
             iconStyleForFile(this._extensionPath, this._claudeIconBasename()),
         );
-        this._codexPanel.icon.set_style(
+        setInlineStyle(
+            this._codexPanel.icon,
             iconStyleForFile(this._extensionPath, this._codexIconBasename()),
         );
     }
@@ -277,6 +327,17 @@ class UsageIndicator extends PanelMenu.Button {
                     : PopupMenu.Ornament.NONE,
             );
         }
+    }
+
+    _ensurePopup() {
+        if (this._popupBuilt)
+            return;
+
+        this._popupBuilt = true;
+        this._buildPopup();
+        // Fill it in before it is shown, so the first open never flashes
+        // placeholder text.
+        this._refreshRelativeTimes();
     }
 
     _buildPopup() {
@@ -302,7 +363,7 @@ class UsageIndicator extends PanelMenu.Button {
 
         const footerRow = new St.BoxLayout({style_class: 'usage-footer-row'});
         footerRow.set_x_expand(true);
-        this._versionLabel = new St.Label({text: 'codex-claude-status-bar 1.3.0'});
+        this._versionLabel = new St.Label({text: ''});
         this._nextUpdateLabel = new St.Label({text: 'Next update in --'});
         const footerSpacer = new St.Widget();
         footerSpacer.set_x_expand(true);
@@ -475,6 +536,9 @@ class UsageIndicator extends PanelMenu.Button {
     }
 
     _startRelativeTimeTimer() {
+        if (this._timerSourceId)
+            return;
+
         this._timerSourceId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             60,
@@ -483,6 +547,14 @@ class UsageIndicator extends PanelMenu.Button {
                 return GLib.SOURCE_CONTINUE;
             },
         );
+    }
+
+    _stopRelativeTimeTimer() {
+        if (!this._timerSourceId)
+            return;
+
+        GLib.source_remove(this._timerSourceId);
+        this._timerSourceId = 0;
     }
 
     _hasWindowData(window) {
@@ -510,13 +582,13 @@ class UsageIndicator extends PanelMenu.Button {
         const showSession = windowsMode !== 'weekly' && this._hasWindowData(sessionWindow);
         const showWeekly = windowsMode !== 'session' && this._hasWindowData(weeklyWindow);
 
-        panel.sessionLabel.text = `5h ${this._formatPctText(sessionWindow)}`;
-        panel.weeklyLabel.text = `7d ${this._formatPctText(weeklyWindow)}`;
+        setText(panel.sessionLabel, `5h ${this._formatPctText(sessionWindow)}`);
+        setText(panel.weeklyLabel, `7d ${this._formatPctText(weeklyWindow)}`);
 
         const sessionColor = colorize ? pctColor(sessionWindow.remainingPct) : '';
         const weeklyColor = colorize ? pctColor(weeklyWindow.remainingPct) : '';
-        panel.sessionLabel.set_style(sessionColor ? `color: ${sessionColor};` : '');
-        panel.weeklyLabel.set_style(weeklyColor ? `color: ${weeklyColor};` : '');
+        setInlineStyle(panel.sessionLabel, sessionColor ? `color: ${sessionColor};` : '');
+        setInlineStyle(panel.weeklyLabel, weeklyColor ? `color: ${weeklyColor};` : '');
 
         panel.sessionLabel.visible = showSession;
         panel.weeklyLabel.visible = showWeekly;
@@ -528,9 +600,9 @@ class UsageIndicator extends PanelMenu.Button {
         if (panel.fableLabel) {
             const fableWindow = svc.windows[2];
             if (fableWindow && !fableWindow.remainingText.startsWith('--')) {
-                panel.fableLabel.text = `F ${this._formatPctText(fableWindow)}`;
+                setText(panel.fableLabel, `F ${this._formatPctText(fableWindow)}`);
                 const fableColor = colorize ? pctColor(fableWindow.remainingPct) : '';
-                panel.fableLabel.set_style(fableColor ? `color: ${fableColor};` : '');
+                setInlineStyle(panel.fableLabel, fableColor ? `color: ${fableColor};` : '');
                 panel.fableSlash.show();
                 panel.fableLabel.show();
             } else {
@@ -577,7 +649,7 @@ class UsageIndicator extends PanelMenu.Button {
         if (!showClaude && !showCodex) {
             this._panelBox.hide();
             this._fallbackLabel.show();
-            this._fallbackLabel.text = '--';
+            setText(this._fallbackLabel, '--');
         }
     }
 
@@ -604,13 +676,18 @@ class UsageIndicator extends PanelMenu.Button {
     _applyViewModel(vm) {
         this._updatePanel(vm);
 
+        // Polls and setting changes keep arriving while the popup has never
+        // been opened; there is nothing downstream to write into yet.
+        if (!this._popupBuilt)
+            return;
+
         const sections = [this._codexSection, this._claudeSection];
 
         for (let i = 0; i < vm.services.length; i++) {
             const svc = vm.services[i];
             const section = sections[i];
 
-            section.nameLabel.text = svc.name;
+            setText(section.nameLabel, svc.name);
 
             // A section may own more widgets than the view-model has windows
             // (Claude's Fable row is optional) — hide the surplus.
@@ -624,37 +701,39 @@ class UsageIndicator extends PanelMenu.Button {
                 }
                 widgets.box.show();
 
-                widgets.label.text = w.label;
-                widgets.fill.style_class = FILL_CLASSES[w.dotColor] ?? 'usage-fill-red';
+                setText(widgets.label, w.label);
+                setStyleClass(widgets.fill, FILL_CLASSES[w.dotColor] ?? 'usage-fill-red');
                 widgets.fill._remainingPct = w.remainingPct;
-                widgets.remainingLabel.text = w.remainingText;
-                widgets.resetsLabel.text = w.resetsInText;
+                setText(widgets.remainingLabel, w.remainingText);
+                setText(widgets.resetsLabel, w.resetsInText);
 
                 const node = widgets.track.get_theme_node();
                 if (node) {
                     const contentBox = node.get_content_box(widgets.track.get_allocation_box());
                     const contentWidth = contentBox.x2 - contentBox.x1;
                     if (contentWidth > 0)
-                        widgets.fill.set_width(Math.round(contentWidth * w.remainingPct / 100));
+                        setWidth(widgets.fill, Math.round(contentWidth * w.remainingPct / 100));
                 }
             }
 
             if (svc.warning) {
-                section.warningLabel.text = svc.warning;
+                setText(section.warningLabel, svc.warning);
                 section.warningLabel.show();
             } else {
                 section.warningLabel.hide();
             }
         }
 
-        this._versionLabel.text = vm.version;
-        this._nextUpdateLabel.text = vm.lastUpdate;
+        setText(this._versionLabel, vm.version);
+        setText(this._nextUpdateLabel, vm.lastUpdate);
     }
 
     destroy() {
-        if (this._timerSourceId) {
-            GLib.source_remove(this._timerSourceId);
-            this._timerSourceId = 0;
+        this._stopRelativeTimeTimer();
+
+        if (this._openStateChangedId && this.menu) {
+            this.menu.disconnect(this._openStateChangedId);
+            this._openStateChangedId = null;
         }
 
         if (this._refreshSignalId && this._refreshItem) {
