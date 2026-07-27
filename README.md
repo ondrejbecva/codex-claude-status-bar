@@ -22,11 +22,6 @@ reads the credential files the Claude Code and Codex CLIs already write.
 *Above: Codex shows only `7d` because OpenAI reports no 5-hour window on that
 plan — the extension drops the window instead of printing `5h --`.*
 
-> **Fork of [`brainusage`](https://github.com/AltairInglorious/brainusage) by
-> AltairInglorious** (MIT). Created to fix Codex reporting after OpenAI changed
-> its usage API, then extended with a per-provider panel layout and Claude
-> Fable tracking — see [What's different](#whats-different).
-
 ---
 
 ## Features
@@ -140,20 +135,18 @@ window, it shows up here automatically.
 bearer on requests to those official provider endpoints. No third-party servers,
 no analytics, no telemetry.
 
-## What's different (vs. upstream brainusage)
+## Codex usage-API handling
 
-- **Codex schema fix.** OpenAI changed
-  `chatgpt.com/backend-api/wham/usage`: the 7-day weekly window now arrives as
-  `primary_window` (`limit_window_seconds: 604800`) with `secondary_window`
-  often `null`. Upstream assumed a fixed layout (`primary` = 5h, `secondary` =
-  7d) and hard-failed with `partial_data` when the secondary was missing — so
-  Codex readouts were mislabelled and the weekly bar stuck at 0 % / red. This
-  fork classifies each window by its own `limit_window_seconds` (< 1 day →
-  session, ≥ 1 day → weekly) and accepts a single-window response. Works with
-  both old and new shapes. (`src/lib/core/normalize.js`)
-- **Per-provider panel** — each provider's icon plus its own `5h / 7d`
-  percentages in the top bar.
-- **Claude Fable** — optional tracking of Claude's model-scoped Fable weekly cap.
+OpenAI reshaped `chatgpt.com/backend-api/wham/usage`: the 7-day weekly window
+now arrives as `primary_window` (`limit_window_seconds: 604800`) with
+`secondary_window` often `null`. Parsers that assume a fixed layout
+(`primary` = 5h, `secondary` = 7d) mislabel the readout and fail outright when
+the secondary is missing.
+
+This extension classifies each window by its own `limit_window_seconds`
+(< 1 day → session, ≥ 1 day → weekly) and accepts a single-window response, so
+it works with both the old and new payload shapes.
+(`src/lib/core/normalize.js`)
 
 ## Project layout
 
@@ -171,8 +164,7 @@ install.sh  uninstall.sh  pack.sh
 
 ## Credits & license
 
-- Original work: **[brainusage](https://github.com/AltairInglorious/brainusage)**
-  by AltairInglorious.
-- Fork, Codex schema fix, per-provider panel, Fable tracking, packaging: Ondřej Bečva.
-
-MIT — see [LICENSE](LICENSE). Both copyright notices are retained.
+MIT — see [LICENSE](LICENSE), which carries the copyright notices for both this
+project and the codebase it started from,
+[brainusage](https://github.com/AltairInglorious/brainusage) by
+AltairInglorious.
