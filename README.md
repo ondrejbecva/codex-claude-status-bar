@@ -15,10 +15,14 @@ reads the credential files the Claude Code and Codex CLIs already write.
  Claude 5h 65% / 7d 52%  │  Codex 5h -- / 7d 100%
 ```
 
+<p align="center">
+  <img src="docs/screenshot-popup.png" alt="The popup: per-window remaining %, reset countdowns, and the settings section" width="380">
+</p>
+
 > **Fork of [`brainusage`](https://github.com/AltairInglorious/brainusage) by
 > AltairInglorious** (MIT). Created to fix Codex reporting after OpenAI changed
-> its usage API, then extended with a combined panel mode and Claude Fable
-> tracking — see [What's different](#whats-different).
+> its usage API, then extended with a per-provider panel layout and Claude
+> Fable tracking — see [What's different](#whats-different).
 
 ---
 
@@ -27,11 +31,11 @@ reads the credential files the Claude Code and Codex CLIs already write.
 - **Both providers, both windows** — Claude and Codex, session (5h) + weekly (7d).
 - **At-a-glance colour** — green ≥ 70 %, yellow ≥ 30 %, red below.
 - **Detail popup** — per-window remaining %, reset countdown, manual refresh.
-- **Flexible panel** — show both providers side by side, one combined
-  `5h / 7d`, or any single metric you pick.
+- **Compact panel** — both providers side by side, each as icon + `5h X% / 7d Y%`.
 - **Claude Fable** — optional row + top-bar segment for Claude's model-scoped
   Fable weekly cap.
-- **Low-quota alerts** — desktop notification when a window drops below 20 %.
+- **Low-quota alerts** — desktop notification when a window drops below 20 %,
+  and again when it resets.
 - **Zero setup** — no keys to paste; credentials come from the CLIs.
 
 ## Supported platforms
@@ -92,17 +96,26 @@ Log out and back in. Uninstall with `./uninstall.sh`.
 
 ## Configuration
 
-Click the panel indicator to open the popup; the toggles live at the bottom of
-that menu:
+Click the panel indicator to open the popup; the settings live at the bottom of
+that menu.
+
+The top bar always shows each provider as *icon + percentages*; everything else
+is per provider, under the **Claude** and **Codex** submenus:
 
 | Option | What it does |
 | --- | --- |
-| **Per-provider panel layout** | *ON (default):* both providers side by side, each `5h X% / 7d Y%` with its icon (a provider hides when it has no data). *OFF:* a single label chosen below. |
-| **Panel display** | The single-label content. Default `combined` (`5h X% / 7d Y%`, worst-case across both providers per window); or `min` (lowest % anywhere); or one specific metric (Claude/Codex × session/weekly, plus Claude Fable). |
-| **Show Claude Fable usage** | Adds a `F Z%` segment to the Claude top-bar group, a **Fable** row in the popup, and the *Claude Fable* single-label metric. Reads Claude's model-scoped weekly cap. Off by default; the top-bar segment appears only when your account reports a Fable limit. |
+| **Show in top bar** | Per provider. Off hides that provider's icon and percentages from the bar; its popup section stays. A provider also hides itself while it has no data. |
+| **5h + 7d / 5h only / 7d only** | Per provider — which windows that provider contributes to the bar. Default `5h + 7d`. A window the provider does not report is dropped rather than shown as `--`. |
+| **Show Fable usage** (Claude) | Adds a `F Z%` segment to the Claude top-bar group and a **Fable** row in the popup. Reads Claude's model-scoped weekly cap. Off by default; the segment appears only when your account reports a Fable limit. |
+| **Icon** (Claude) | Starburst (Claude) vs. bracketed dots (Claude Code) mark. |
+
+Global toggles sit directly in the menu:
+
+| Option | What it does |
+| --- | --- |
 | **Colorize percentages** | Colour the panel numbers by remaining %. |
 | **Colored icons** | Brand-coloured provider icons vs. a mono grey that blends with the bar. |
-| **Claude icon** | Starburst (Claude) vs. bracketed dots (Claude Code) mark. |
+| **Notify on limit reset** | Desktop notification when a 5h or 7d window hands its quota back. On by default. |
 
 ## How it works
 
@@ -114,6 +127,11 @@ endpoint, and normalises the response into remaining-% + reset-time per window.
 | --- | --- | --- | --- |
 | Claude | `~/.claude/.credentials.json` | `platform.claude.com` | `api.anthropic.com/api/oauth/usage` |
 | Codex  | `~/.codex/auth.json` | `auth.openai.com` | `chatgpt.com/backend-api/wham/usage` |
+
+**Codex 5h window:** OpenAI's usage payload currently reports only a 7-day
+window for some plans (`secondary_window: null`) — Codex CLI's own `/status`
+omits its 5-hour line in exactly that case. When your account does report a 5h
+window, it shows up here automatically.
 
 **Privacy:** credentials never leave your machine except as the `Authorization`
 bearer on requests to those official provider endpoints. No third-party servers,
@@ -130,8 +148,8 @@ no analytics, no telemetry.
   fork classifies each window by its own `limit_window_seconds` (< 1 day →
   session, ≥ 1 day → weekly) and accepts a single-window response. Works with
   both old and new shapes. (`src/lib/core/normalize.js`)
-- **Combined panel mode** — `5h / 7d` worst-case across both providers, now the
-  single-label default.
+- **Per-provider panel** — each provider's icon plus its own `5h / 7d`
+  percentages in the top bar.
 - **Claude Fable** — optional tracking of Claude's model-scoped Fable weekly cap.
 
 ## Project layout
@@ -152,6 +170,6 @@ install.sh  uninstall.sh  pack.sh
 
 - Original work: **[brainusage](https://github.com/AltairInglorious/brainusage)**
   by AltairInglorious.
-- Fork, Codex schema fix, combined mode, Fable tracking, packaging: Ondřej Bečva.
+- Fork, Codex schema fix, per-provider panel, Fable tracking, packaging: Ondřej Bečva.
 
 MIT — see [LICENSE](LICENSE). Both copyright notices are retained.
