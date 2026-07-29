@@ -38,17 +38,22 @@ plan — the extension drops the window instead of printing `5h --`.*
 
 ## Supported platforms
 
-| | Supported |
-| --- | --- |
-| **Desktop** | GNOME Shell **45 – 50** |
-| **Display server** | Wayland **and** X11 |
-| **Distros** | Any with GNOME 45+ — e.g. Ubuntu 24.04 / 25.04, Fedora 40+, Debian 13, Arch |
-| **Architecture** | Any (pure GJS/JavaScript — no native code) |
+| Platform | How it runs | Status |
+| --- | --- | --- |
+| **Linux / GNOME** | Shell extension, GNOME **45 – 50**, Wayland **and** X11 | Shipping |
+| **macOS** | Menu-bar plugin for [xbar](https://xbarapp.com) / [SwiftBar](https://swiftbar.app), needs Node 18+ | Working |
+| **Any OS** | `platforms/cli/usage.js`, text or `--json`, needs Node 18+ | Working |
+| **Windows** | Tray icon — the data path works, the tray shell is not built | Planned |
+| **Linux / KDE** | — | Not built |
 
-Not supported: KDE Plasma / other desktops, macOS, Windows — this is a GNOME
-Shell extension. The fetch-and-parse core (`src/lib/`) is plain JavaScript and
-portable, so a menu-bar port (e.g. xbar/SwiftBar on macOS) is feasible but not
-included here.
+The fetch-and-parse core in `core/` imports no platform API; each entry in
+`platforms/` supplies a runtime and a way to draw. See
+[platforms/README.md](platforms/README.md) for macOS install steps and what
+Windows still needs.
+
+Distros for the GNOME extension: anything with GNOME 45+ — Ubuntu 24.04 / 25.04,
+Fedora 40+, Debian 13, Arch. No native code anywhere, so architecture is
+irrelevant.
 
 > **Wayland note:** GNOME Shell can't hot-reload extension code on Wayland, so a
 > newly installed or updated version loads after you **log out and back in**
@@ -151,16 +156,34 @@ it works with both the old and new payload shapes.
 ## Project layout
 
 ```
-src/                    # the installable extension (uuid: codex-claude-status-bar@ondrejbecva.cz)
+core/                   # platform-free: no gi://, no Node, no DOM
+  poller.js             # drives providers on an interval, publishes a summary
+  provider-slot.js      # one provider's latest state
+  retry.js              # backs a provider off after repeated failures
+  summary.js            # folds slots into one object
+  providers/            # claude.js, codex.js + the shared OAuth harness
+  normalize.js          # usage payload -> remaining % + reset time
+  view-model.js         # summary -> exactly what a UI draws
+  format.js             # every user-facing string
+  notifications.js      # low-quota and rollover detection
+
+platforms/
+  gnome/runtime.js      # libsoup + Gio shims
+  node/runtime.js       # global fetch + fs shims
+  xbar/                 # macOS menu-bar plugin
+  cli/usage.js          # text / --json, the seam for other shells
+
+src/                    # the GNOME extension (uuid: codex-claude-status-bar@ondrejbecva.cz)
   extension.js          # panel indicator + popup UI
-  lib/core/             # scheduler, state, aggregate, normalize (schema parsing), notifications
-  lib/providers/        # claude.js, codex.js — fetch + OAuth refresh
-  lib/runtime/          # fetch + file-read shims
-  lib/ui/render.js      # view-model builder
-  schemas/              # GSettings schema
-  icons/                # provider SVGs
+  lib/                  # still in use by the extension; being retired in favour of core/
+  schemas/  icons/  stylesheet.css
+
+test/                   # 122 cases, node:test, no dependencies — `npm test`
 install.sh  uninstall.sh  pack.sh
 ```
+
+`pack.sh` ships `src/` only, so `core/`, `platforms/` and `test/` are not part
+of the GNOME extension zip.
 
 ## Credits & license
 
