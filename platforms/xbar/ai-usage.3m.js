@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // <xbar.title>AI usage limits</xbar.title>
-// <xbar.version>v1.4.0</xbar.version>
+// <xbar.version>v1.4.1</xbar.version>
 // <xbar.author>Ondřej Bečva</xbar.author>
 // <xbar.desc>Claude and Codex rate-limit windows in the macOS menu bar.</xbar.desc>
 // <xbar.dependencies>node</xbar.dependencies>

@@ -12,7 +12,7 @@ import {
     resetsInLabel,
 } from './format.js';
 
-export const VERSION = 'codex-claude-status-bar 1.4.0';
+export const VERSION = 'codex-claude-status-bar 1.4.1';
 
 const DEFAULT_POLL_INTERVAL_MS = 180_000;
 
