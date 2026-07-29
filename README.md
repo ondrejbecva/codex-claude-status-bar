@@ -122,36 +122,26 @@ Global toggles sit directly in the menu:
 
 ## How it works
 
-Every **3 minutes** the extension refreshes each provider: it reads the local
-credential file, refreshes the OAuth access token if needed, calls the usage
-endpoint, and normalises the response into remaining-% + reset-time per window.
+Every **3 minutes** the extension asks each provider how much quota is left. It
+reuses the sign-in the Claude Code and Codex CLIs already performed, renewing
+the token when it has aged out, and turns the answer into a remaining
+percentage and a reset time per window.
 
-| Provider | Credentials (read locally) | Token refresh | Usage endpoint |
-| --- | --- | --- | --- |
-| Claude | `~/.claude/.credentials.json` | `platform.claude.com` | `api.anthropic.com/api/oauth/usage` |
-| Codex  | `~/.codex/auth.json` | `auth.openai.com` | `chatgpt.com/backend-api/wham/usage` |
+**Privacy:** your credentials stay on your machine. They are sent nowhere
+except to Claude's and OpenAI's own APIs, as the authorisation header on the
+request asking for your usage — the same call the official CLIs make. No
+third-party servers, no analytics, no telemetry.
 
-**Codex 5h window:** OpenAI's usage payload currently reports only a 7-day
-window for some plans (`secondary_window: null`) — Codex CLI's own `/status`
-omits its 5-hour line in exactly that case. When your account does report a 5h
-window, it shows up here automatically.
+**Windows differ by plan.** Some Codex plans report only a 7-day window and no
+5-hour one; Codex CLI's own `/status` leaves its 5-hour line out in exactly
+that case. The extension shows the windows your account actually reports, so a
+5-hour window appears by itself once your plan includes one.
 
-**Privacy:** credentials never leave your machine except as the `Authorization`
-bearer on requests to those official provider endpoints. No third-party servers,
-no analytics, no telemetry.
-
-## Codex usage-API handling
-
-OpenAI reshaped `chatgpt.com/backend-api/wham/usage`: the 7-day weekly window
-now arrives as `primary_window` (`limit_window_seconds: 604800`) with
-`secondary_window` often `null`. Parsers that assume a fixed layout
-(`primary` = 5h, `secondary` = 7d) mislabel the readout and fail outright when
-the secondary is missing.
-
-This extension classifies each window by its own `limit_window_seconds`
-(< 1 day → session, ≥ 1 day → weekly) and accepts a single-window response, so
-it works with both the old and new payload shapes.
-(`src/lib/core/normalize.js`)
+Providers also move their reporting formats around — a window can change which
+field it arrives in, or stop being sent at all. Rather than trusting position,
+each window is identified by the duration it declares about itself, so a
+reshuffled or single-window response is read correctly instead of being
+mislabelled or rejected (`core/normalize.js`).
 
 ## Project layout
 
