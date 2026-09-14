@@ -1,3 +1,4 @@
+import {encodeFormBody} from '../core/form.js';
 import {normalizeCodexUsage} from '../core/normalize.js';
 
 const CREDENTIALS_PATH = '~/.codex/auth.json';
@@ -86,7 +87,7 @@ async function refreshAccessToken(fetchImpl, refreshToken) {
     if (!refreshToken)
         return fail('auth_expired', 'OAuth refresh token is missing');
 
-    const body = new URLSearchParams({
+    const body = encodeFormBody({
         grant_type: 'refresh_token',
         client_id: CODEX_CLIENT_ID,
         refresh_token: refreshToken,

@@ -127,6 +127,47 @@ test('an expired stored token is refreshed before the usage call', async () => {
     assert.equal(calls[1].options.headers.authorization, 'Bearer fresh-token');
 });
 
+// GJS has no URLSearchParams, so a refresh body built with it threw a
+// ReferenceError inside GNOME Shell. The throw was swallowed by the catch in
+// getUsage() and reported as a network error, which made an expired token look
+// like an offline machine. Node defines the global, so the only way to cover
+// the GNOME runtime from here is to take it away.
+test('a refresh body is built without URLSearchParams, which GJS lacks', async () => {
+    const {URLSearchParams: saved} = globalThis;
+    delete globalThis.URLSearchParams;
+
+    try {
+        const {fetchImpl, calls} = transport([
+            ['oauth/token', response(200, {access_token: 'fresh-token'})],
+            ['oauth/usage', response(200, CLAUDE_USAGE)],
+        ]);
+
+        const provider = createClaudeProvider({
+            fetch: fetchImpl,
+            readTextFile: readsFile(JSON.stringify({
+                claudeAiOauth: {
+                    accessToken: 'stale-token',
+                    refreshToken: 'refresh-token',
+                    expiresAt: 1_000_000,
+                },
+            })),
+            now: () => 2_000_000 * 1000,
+        });
+
+        const result = await provider.getUsage();
+
+        assert.equal(result.ok, true);
+
+        // Every runtime gets a plain encoded string, not a Web API object.
+        const {body} = calls[0].options;
+        assert.equal(typeof body, 'string');
+        assert.equal(body.includes('grant_type=refresh_token'), true);
+        assert.equal(body.includes('refresh_token=refresh-token'), true);
+    } finally {
+        globalThis.URLSearchParams = saved;
+    }
+});
+
 test('a token rejected at the endpoint is refreshed once and retried', async () => {
     const {fetchImpl, calls} = transport([
         ['oauth/token', response(200, {access_token: 'fresh-token'})],

@@ -16,12 +16,10 @@ function resolveBody(options) {
     if (typeof body === 'string')
         return body;
 
-    if (body instanceof URLSearchParams)
-        return body.toString();
-
     if (body instanceof Uint8Array)
         return body;
 
+    // Naming `URLSearchParams` here would itself throw: GJS does not define it.
     return String(body);
 }
 

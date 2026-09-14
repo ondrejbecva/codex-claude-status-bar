@@ -24,8 +24,8 @@ function contentTypeOf(headers) {
     return match?.[1] ?? 'application/octet-stream';
 }
 
-// Accepts what the core actually sends: a string, URLSearchParams from the
-// token refreshes, or raw bytes.
+// Accepts what the core actually sends: a string, or raw bytes. Naming
+// `URLSearchParams` here would itself throw, since GJS does not define it.
 function bodyBytes(body) {
     if (body === undefined || body === null)
         return null;
@@ -33,9 +33,7 @@ function bodyBytes(body) {
     if (body instanceof Uint8Array)
         return new GLib.Bytes(body);
 
-    const text = body instanceof URLSearchParams ? body.toString() : String(body);
-
-    return new GLib.Bytes(encoder.encode(text));
+    return new GLib.Bytes(encoder.encode(String(body)));
 }
 
 // Enough of the WHATWG Response surface for the core: ok, status, text, json.

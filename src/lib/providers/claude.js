@@ -1,3 +1,4 @@
+import {encodeFormBody} from '../core/form.js';
 import {normalizeClaudeUsage} from '../core/normalize.js';
 
 const CREDENTIALS_PATH = '~/.claude/.credentials.json';
@@ -121,7 +122,7 @@ async function refreshAccessToken(fetchImpl, refreshToken) {
     if (!refreshToken)
         return fail('auth_expired', 'OAuth refresh token is missing');
 
-    const body = new URLSearchParams({
+    const body = encodeFormBody({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
         client_id: CLAUDE_CLIENT_ID,

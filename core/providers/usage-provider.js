@@ -8,6 +8,7 @@
 // `readTextFile`, which is what lets the same provider run inside GNOME Shell
 // under libsoup and inside Node under global fetch.
 
+import {encodeFormBody} from '../form.js';
 import {failed, failureForStatus, readJson, usable} from '../result.js';
 
 function expandHome(path, homeDir) {
@@ -68,7 +69,7 @@ export function createUsageProvider(spec, options = {}) {
         const response = await fetchImpl(spec.refreshEndpoint, {
             method: 'POST',
             headers: {'content-type': 'application/x-www-form-urlencoded'},
-            body: new URLSearchParams({
+            body: encodeFormBody({
                 grant_type: 'refresh_token',
                 refresh_token: refreshToken,
                 client_id: spec.clientId,
