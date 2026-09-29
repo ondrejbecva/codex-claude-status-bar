@@ -8,3 +8,10 @@ src/schemas/gschemas.compiled
 # Editor / OS cruft
 .DS_Store
 *.swp
+
+# Agent scaffold that stays local: this repository is public, and session
+# reports and plans describe internal state. AGENTS.md is committed.
+/docs/reports/
+/docs/README.md
+/.plan/
+/.project/
